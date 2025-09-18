@@ -3,5 +3,4 @@ python-dotenv==1.0.1
 Pillow==10.4.0
 numpy==1.26.2
 supabase==1.0.0
-git+https://github.com/razer-blitz/face_recognition.git
-face-recognition-models>=0.3.0
+gunicorn==20.1.0  # For running Flask on Render
