@@ -5,6 +5,7 @@
   <title>Face Recognition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/blueimp-load-image@5.16.0/js/load-image.all.min.js"></script>
   <style>
     .spinner {
       border: 4px solid rgba(255, 255, 255, 0.2);
@@ -15,7 +16,23 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #preview { max-width: 200px; margin: 10px auto; }
+    #preview { 
+      max-width: 100%; 
+      max-height: 480px; 
+      margin: 10px auto; 
+      object-fit: contain; 
+      display: block; 
+    }
+    #webcam {
+      max-width: 100%;
+      max-height: 480px;
+      object-fit: contain;
+    }
+    #canvas {
+      max-width: 100%;
+      max-height: 480px;
+      object-fit: contain;
+    }
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-slate-800 to-gray-700 text-white font-sans">
@@ -37,8 +54,8 @@
             <option value="{{ name }}">{{ name }}</option>
           {% endfor %}
         </select>
-        <video id="webcam" width="320" height="240" autoplay class="rounded-lg shadow-md w-full mb-4 border border-slate-600"></video>
-        <canvas id="canvas" width="320" height="240" class="hidden"></canvas>
+        <video id="webcam" autoplay class="rounded-lg shadow-md w-full mb-4 border border-slate-600"></video>
+        <canvas id="canvas" class="hidden"></canvas>
         <img id="preview" class="hidden" alt="Captured Preview">
         <input type="file" name="file" id="image-data" accept="image/jpeg" class="hidden">
         <div id="verify-error" class="text-red-400 mb-4 hidden"></div>
@@ -101,6 +118,7 @@
     const adminError = document.getElementById('admin-error');
     const adminUploadError = document.getElementById('admin-upload-error');
     const overlay = document.getElementById('loadingOverlay');
+    const verifyForm = document.getElementById('verify-form');
     let stream = null;
 
     // Tab switching
@@ -152,12 +170,23 @@
     // Start webcam
     startWebcamButton.addEventListener('click', async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user'
+          }
+        });
         webcam.srcObject = stream;
+        webcam.onloadedmetadata = () => {
+          // Dynamically set canvas to match video's native dimensions (preserves aspect ratio)
+          canvas.width = webcam.videoWidth;
+          canvas.height = webcam.videoHeight;
+          console.log(`Webcam started, native resolution: ${webcam.videoWidth}x${webcam.videoHeight}`);
+        };
         captureButton.classList.remove('hidden');
         startWebcamButton.classList.add('hidden');
         verifyError.classList.add('hidden');
-        console.log('Webcam started, resolution: 320x240');
       } catch (err) {
         verifyError.textContent = 'Error accessing webcam: ' + err.message;
         verifyError.classList.remove('hidden');
@@ -171,7 +200,11 @@
         imageDataInput.value = null;
         verifyError.classList.add('hidden');
         const context = canvas.getContext('2d');
+
+        // Draw video frame to canvas at native dimensions (no stretching)
         context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+
+        // Convert to blob with higher quality
         canvas.toBlob(blob => {
           if (!blob) {
             verifyError.textContent = 'Failed to capture photo.';
@@ -179,15 +212,48 @@
             console.error('Canvas toBlob failed');
             return;
           }
-          const file = new File([blob], 'webcam_capture.jpg', { type: 'image/jpeg' });
-          const dataTransfer = new DataTransfer();
-          dataTransfer.items.add(file);
-          imageDataInput.files = dataTransfer.files;
-          preview.src = URL.createObjectURL(file);
-          preview.classList.remove('hidden');
-          console.log('Photo captured, file size:', file.size, 'bytes');
-          alert('Photo captured! Click "Upload & Match" to proceed.');
-        }, 'image/jpeg', 0.6);
+
+          // Use loadImage to handle any EXIF orientation (though less critical for webcam streams)
+          loadImage(
+            blob,
+            (img) => {
+              // If orientation correction changes size, update canvas
+              if (img.width !== canvas.width || img.height !== canvas.height) {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                context.drawImage(img, 0, 0);
+              }
+
+              // Convert back to blob
+              canvas.toBlob(
+                correctedBlob => {
+                  if (!correctedBlob) {
+                    verifyError.textContent = 'Failed to process photo.';
+                    verifyError.classList.remove('hidden');
+                    console.error('Canvas toBlob failed after processing');
+                    return;
+                  }
+                  const file = new File([correctedBlob], 'webcam_capture.jpg', { type: 'image/jpeg' });
+                  const dataTransfer = new DataTransfer();
+                  dataTransfer.items.add(file);
+                  imageDataInput.files = dataTransfer.files;
+                  preview.src = URL.createObjectURL(file);
+                  preview.classList.remove('hidden');
+                  console.log(`Photo captured, dimensions: ${canvas.width}x${canvas.height}, file size: ${file.size} bytes`);
+                  alert('Photo captured! Click "Upload & Match" to proceed.');
+                },
+                'image/jpeg',
+                0.9 // High quality to avoid compression artifacts
+              );
+            },
+            { 
+              orientation: true, 
+              canvas: true,
+              maxWidth: 1024, // Allow higher res but cap to prevent huge files
+              maxHeight: 1024 
+            }
+          );
+        }, 'image/jpeg', 0.9);
       } catch (err) {
         verifyError.textContent = 'Error capturing photo: ' + err.message;
         verifyError.classList.remove('hidden');
@@ -200,21 +266,42 @@
       console.log('Validating verify form, files:', imageDataInput.files);
       verifyError.classList.add('hidden');
       if (!imageDataInput.files || imageDataInput.files.length === 0) {
-        verifyError.textContent = 'Please capture a photo first.';
+        verifyError.textContent = 'Please capture or upload a photo.';
         verifyError.classList.remove('hidden');
         console.error('No file attached to image-data input');
         return false;
       }
-      if (imageDataInput.files[0].size > 5 * 1024 * 1024) {
-        verifyError.textContent = 'Captured image too large. Max size is 5MB.';
+      const file = imageDataInput.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        verifyError.textContent = 'Image too large. Max size is 5MB.';
         verifyError.classList.remove('hidden');
-        console.error('File size too large:', imageDataInput.files[0].size);
+        console.error('File size too large:', file.size);
         return false;
       }
-      verifySubmit.disabled = true;
-      overlay.classList.remove('hidden');
-      console.log('Verify form validated, submitting...');
-      return true;
+      // Validate dimensions asynchronously
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        if (img.naturalWidth < 300 || img.naturalHeight < 300) {
+          verifyError.textContent = 'Image resolution too low. Minimum 300x300 pixels required.';
+          verifyError.classList.remove('hidden');
+          console.error('Image resolution too low:', img.naturalWidth, 'x', img.naturalHeight);
+          URL.revokeObjectURL(img.src);
+          return false;
+        }
+        URL.revokeObjectURL(img.src);
+        verifySubmit.disabled = true;
+        overlay.classList.remove('hidden');
+        console.log('Verify form validated, submitting...');
+        verifyForm.submit();
+      };
+      img.onerror = () => {
+        verifyError.textContent = 'Error loading captured image.';
+        verifyError.classList.remove('hidden');
+        console.error('Image load error');
+        return false;
+      };
+      return false; // Prevent immediate submission
     }
 
     // Validate admin form
