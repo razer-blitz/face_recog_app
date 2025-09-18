@@ -5,6 +5,3 @@ numpy==1.26.2
 supabase==1.0.0
 git+https://github.com/razer-blitz/face_recognition.git
 face-recognition-models>=0.3.0
-setuptools>=68.0
-wheel
-pip>=25.2
