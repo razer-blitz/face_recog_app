@@ -2,66 +2,162 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Face Recognition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-    video, canvas { border: 1px solid black; margin: 10px; }
-    .hidden { display: none; }
-    #verify-error { color: red; margin-top: 10px; }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top: 4px solid #38b2ac;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #preview { max-width: 200px; margin: 10px auto; }
   </style>
 </head>
-<body>
-  <h1>Face Recognition</h1>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-slate-800 to-gray-700 text-white font-sans">
+  <div class="bg-white bg-opacity-10 rounded-xl shadow-xl p-6 sm:p-8 max-w-lg w-full text-center border border-white border-opacity-10">
+    <!-- Tabs -->
+    <div class="flex justify-center mb-4">
+      <button id="verify-tab" class="px-4 py-2 font-semibold text-teal-300 border-b-2 border-teal-300">Verify Face</button>
+      <button id="admin-tab" class="px-4 py-2 font-semibold text-gray-300">Admin</button>
+    </div>
 
-  <!-- Webcam preview -->
-  <video id="webcam" autoplay playsinline></video>
-  <canvas id="canvas" class="hidden"></canvas>
+    <!-- Verify Face Tab -->
+    <div id="verify-content" class="tab-content">
+      <h1 class="text-xl font-semibold mb-4 text-teal-300">Face Match Capture</h1>
+      <form id="verify-form" action="/verify" method="post" enctype="multipart/form-data" onsubmit="return validateVerifyForm()">
+        <label for="reference_name" class="block mb-2 text-sm text-gray-300">Reference (optional):</label>
+        <select name="reference_name" id="reference_name" class="mb-4 w-full max-w-xs p-2 rounded bg-gray-100 text-gray-900">
+          <option value="">Check all images</option>
+          {% for name in reference_names %}
+            <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+        <video id="webcam" width="320" height="240" autoplay class="rounded-lg shadow-md w-full mb-4 border border-slate-600"></video>
+        <canvas id="canvas" width="320" height="240" class="hidden"></canvas>
+        <img id="preview" class="hidden" alt="Captured Preview">
+        <input type="file" name="file" id="image-data" accept="image/jpeg" class="hidden">
+        <div id="verify-error" class="text-red-400 mb-4 hidden"></div>
+        <div class="flex flex-wrap justify-center gap-3 mb-4">
+          <button type="button" id="start-webcam" class="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-teal-400 to-teal-500 text-gray-900 shadow hover:shadow-lg transform hover:-translate-y-0.5 transition">Start Webcam</button>
+          <button type="button" id="capture" class="hidden px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-emerald-400 to-emerald-500 text-gray-900 shadow hover:shadow-lg transform hover:-translate-y-0.5 transition">Capture Photo</button>
+        </div>
+        <input type="submit" id="verify-submit" value="Upload & Match" class="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-gray-900 shadow hover:shadow-lg transform hover:-translate-y-0.5 transition cursor-pointer">
+      </form>
+      {% if message %}
+        <p class="{% if 'No match' in message or 'No face' in message or 'No file' in message or 'Error' in message or 'Multiple' in message %}text-red-400 font-semibold mt-4{% else %}text-green-400 font-semibold mt-4{% endif %}">
+          {{ message }}
+        </p>
+      {% endif %}
+    </div>
 
-  <div>
-    <button id="startWebcam">Start Webcam</button>
-    <button id="capture" class="hidden">Capture</button>
+    <!-- Admin Tab -->
+    <div id="admin-content" class="tab-content hidden">
+      <h1 class="text-xl font-semibold mb-4 text-teal-300">Admin Panel</h1>
+      <div id="admin-login" class="mb-4">
+        <label for="admin-password" class="block mb-2 text-sm text-gray-300">Enter Admin Password:</label>
+        <input type="password" id="admin-password" class="mb-4 w-full max-w-xs p-2 rounded bg-gray-100 text-gray-900" placeholder="Password">
+        <button type="button" id="admin-login-btn" class="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-teal-400 to-teal-500 text-gray-900 shadow hover:shadow-lg transform hover:-translate-y-0.5 transition">Login</button>
+        <div id="admin-error" class="text-red-400 mt-2 hidden"></div>
+      </div>
+      <form id="admin-form" action="/add_user" method="post" enctype="multipart/form-data" class="hidden" onsubmit="return validateAdminForm()">
+        <label for="new-name" class="block mb-2 text-sm text-gray-300">Name:</label>
+        <input type="text" name="name" id="new-name" class="mb-4 w-full max-w-xs p-2 rounded bg-gray-100 text-gray-900" placeholder="Enter name" required>
+        <label for="new-uid" class="block mb-2 text-sm text-gray-300">UID (optional):</label>
+        <input type="text" name="uid" id="new-uid" class="mb-4 w-full max-w-xs p-2 rounded bg-gray-100 text-gray-900" placeholder="Enter UID">
+        <label for="new-image" class="block mb-2 text-sm text-gray-300">Upload Image:</label>
+        <input type="file" name="file" id="new-image" accept="image/jpeg,image/png" class="mb-4 w-full max-w-xs p-2 rounded bg-gray-100 text-gray-900">
+        <div id="admin-upload-error" class="text-red-400 mb-4 hidden"></div>
+        <input type="submit" value="Add User" class="px-4 py-2 rounded-lg font-semibold bg-gradient-to-r from-cyan-400 to-blue-500 text-gray-900 shadow hover:shadow-lg transform hover:-translate-y-0.5 transition cursor-pointer">
+      </form>
+    </div>
   </div>
 
-  <!-- Upload form -->
-  <form id="uploadForm" enctype="multipart/form-data" method="POST" action="/add_user">
-    <input type="text" name="name" placeholder="Enter Name" required><br><br>
-    <input type="file" name="file" accept="image/*"><br><br>
-    <input type="hidden" name="image_data" id="imageDataInput">
-    <button type="submit">Add User</button>
-  </form>
-
-  <div id="verify-error" class="hidden"></div>
+  <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden">
+    <div class="spinner"></div>
+  </div>
 
   <script>
     const webcam = document.getElementById('webcam');
     const canvas = document.getElementById('canvas');
-    const startWebcamButton = document.getElementById('startWebcam');
     const captureButton = document.getElementById('capture');
-    const imageDataInput = document.getElementById('imageDataInput');
-    const uploadForm = document.getElementById('uploadForm');
+    const startWebcamButton = document.getElementById('start-webcam');
+    const imageDataInput = document.getElementById('image-data');
+    const verifySubmit = document.getElementById('verify-submit');
     const verifyError = document.getElementById('verify-error');
-
+    const preview = document.getElementById('preview');
+    const verifyTab = document.getElementById('verify-tab');
+    const adminTab = document.getElementById('admin-tab');
+    const verifyContent = document.getElementById('verify-content');
+    const adminContent = document.getElementById('admin-content');
+    const adminLogin = document.getElementById('admin-login');
+    const adminForm = document.getElementById('admin-form');
+    const adminPassword = document.getElementById('admin-password');
+    const adminLoginBtn = document.getElementById('admin-login-btn');
+    const adminError = document.getElementById('admin-error');
+    const adminUploadError = document.getElementById('admin-upload-error');
+    const overlay = document.getElementById('loadingOverlay');
     let stream = null;
 
+    // Tab switching
+    verifyTab.addEventListener('click', () => {
+      verifyTab.classList.add('border-teal-300', 'text-teal-300');
+      adminTab.classList.remove('border-teal-300', 'text-teal-300');
+      adminTab.classList.add('text-gray-300');
+      verifyContent.classList.remove('hidden');
+      adminContent.classList.add('hidden');
+    });
+    adminTab.addEventListener('click', () => {
+      adminTab.classList.add('border-teal-300', 'text-teal-300');
+      verifyTab.classList.remove('border-teal-300', 'text-teal-300');
+      verifyTab.classList.add('text-gray-300');
+      adminContent.classList.remove('hidden');
+      verifyContent.classList.add('hidden');
+    });
+
+    // Admin login
+    adminLoginBtn.addEventListener('click', async () => {
+      adminError.classList.add('hidden');
+      const password = adminPassword.value;
+      if (!password) {
+        adminError.textContent = 'Please enter a password.';
+        adminError.classList.remove('hidden');
+        return;
+      }
+      try {
+        const response = await fetch('/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const result = await response.json();
+        if (result.success) {
+          adminLogin.classList.add('hidden');
+          adminForm.classList.remove('hidden');
+        } else {
+          adminError.textContent = result.message || 'Invalid password.';
+          adminError.classList.remove('hidden');
+        }
+      } catch (err) {
+        adminError.textContent = 'Error verifying password.';
+        adminError.classList.remove('hidden');
+        console.error('Admin login error:', err);
+      }
+    });
+
+    // Start webcam
     startWebcamButton.addEventListener('click', async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
         webcam.srcObject = stream;
-
-        webcam.onloadedmetadata = () => {
-          // optional: scale down while keeping aspect ratio
-          const MAX_SIZE = 600;
-          let scale = Math.min(MAX_SIZE / webcam.videoWidth, MAX_SIZE / webcam.videoHeight, 1);
-          canvas.width = Math.floor(webcam.videoWidth * scale);
-          canvas.height = Math.floor(webcam.videoHeight * scale);
-
-          console.log('Webcam started:', webcam.videoWidth, 'x', webcam.videoHeight);
-        };
-
         captureButton.classList.remove('hidden');
         startWebcamButton.classList.add('hidden');
         verifyError.classList.add('hidden');
+        console.log('Webcam started, resolution: 320x240');
       } catch (err) {
         verifyError.textContent = 'Error accessing webcam: ' + err.message;
         verifyError.classList.remove('hidden');
@@ -69,34 +165,94 @@
       }
     });
 
+    // Capture photo
     captureButton.addEventListener('click', () => {
       try {
         imageDataInput.value = null;
         verifyError.classList.add('hidden');
-
         const context = canvas.getContext('2d');
         context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
-
         canvas.toBlob(blob => {
           if (!blob) {
-            verifyError.textContent = 'Failed to capture image.';
+            verifyError.textContent = 'Failed to capture photo.';
             verifyError.classList.remove('hidden');
+            console.error('Canvas toBlob failed');
             return;
           }
           const file = new File([blob], 'webcam_capture.jpg', { type: 'image/jpeg' });
-
-          // Add to hidden input via DataTransfer
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          document.querySelector('input[name="file"]').files = dt.files;
-
-          // Submit automatically
-          uploadForm.submit();
-        }, 'image/jpeg', 0.8);
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          imageDataInput.files = dataTransfer.files;
+          preview.src = URL.createObjectURL(file);
+          preview.classList.remove('hidden');
+          console.log('Photo captured, file size:', file.size, 'bytes');
+          alert('Photo captured! Click "Upload & Match" to proceed.');
+        }, 'image/jpeg', 0.6);
       } catch (err) {
-        verifyError.textContent = 'Error capturing image: ' + err.message;
+        verifyError.textContent = 'Error capturing photo: ' + err.message;
         verifyError.classList.remove('hidden');
         console.error('Capture error:', err);
+      }
+    });
+
+    // Validate verify form
+    function validateVerifyForm() {
+      console.log('Validating verify form, files:', imageDataInput.files);
+      verifyError.classList.add('hidden');
+      if (!imageDataInput.files || imageDataInput.files.length === 0) {
+        verifyError.textContent = 'Please capture a photo first.';
+        verifyError.classList.remove('hidden');
+        console.error('No file attached to image-data input');
+        return false;
+      }
+      if (imageDataInput.files[0].size > 5 * 1024 * 1024) {
+        verifyError.textContent = 'Captured image too large. Max size is 5MB.';
+        verifyError.classList.remove('hidden');
+        console.error('File size too large:', imageDataInput.files[0].size);
+        return false;
+      }
+      verifySubmit.disabled = true;
+      overlay.classList.remove('hidden');
+      console.log('Verify form validated, submitting...');
+      return true;
+    }
+
+    // Validate admin form
+    function validateAdminForm() {
+      adminUploadError.classList.add('hidden');
+      const fileInput = document.getElementById('new-image');
+      const nameInput = document.getElementById('new-name');
+      if (!fileInput.files || fileInput.files.length === 0) {
+        adminUploadError.textContent = 'Please select an image.';
+        adminUploadError.classList.remove('hidden');
+        return false;
+      }
+      if (fileInput.files[0].size > 5 * 1024 * 1024) {
+        adminUploadError.textContent = 'Image too large. Max size is 5MB.';
+        adminUploadError.classList.remove('hidden');
+        return false;
+      }
+      if (!nameInput.value.trim()) {
+        adminUploadError.textContent = 'Name is required.';
+        adminUploadError.classList.remove('hidden');
+        return false;
+      }
+      overlay.classList.remove('hidden');
+      console.log('Admin form validated, submitting...');
+      return true;
+    }
+
+    // Hide spinner on page load
+    window.addEventListener('load', () => {
+      overlay.classList.add('hidden');
+      verifySubmit.disabled = false;
+    });
+
+    // Stop webcam on page unload
+    window.addEventListener('beforeunload', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Webcam stream stopped');
       }
     });
   </script>
