@@ -3,6 +3,7 @@ python-dotenv==1.0.1
 Pillow==10.4.0
 numpy==1.26.2
 supabase==1.0.0
+https://files.pythonhosted.org/packages/e1/5f/de0892a8877f76aa6eb90de2cf42f33088cd324238be85c7eb0f6d2b9bcf/dlib_bin-19.22.0-cp39-cp39-manylinux2010_x86_64.whl
 face_recognition
 setuptools>=68.0
 wheel
