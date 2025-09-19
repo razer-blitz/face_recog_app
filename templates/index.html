@@ -10,77 +10,78 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f9fafb; /* Light gray bg like Tailwind gray-50 */
-      color: #111827; /* Dark text gray-900 */
+      background: #f9fafb;
+      color: #111827;
       font-family: Arial, sans-serif;
       margin: 0;
     }
     .container {
-      background: white; /* bg-white */
-      border: 1px solid #e5e7eb; /* border gray-200 */
-      border-radius: 0.5rem; /* rounded-lg */
-      padding: 1.25rem; /* p-5 */
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1.25rem;
       max-width: 500px;
       width: 100%;
       text-align: center;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow */
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1),
+                  0 1px 2px rgba(0, 0, 0, 0.06);
     }
     .tabs {
       display: flex;
       justify-content: center;
-      margin-bottom: 1rem; /* mb-4 */
-      border-bottom: 1px solid #e5e7eb; /* divide-y gray-200 */
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #e5e7eb;
     }
     .tab {
-      padding: 0.5rem 1rem; /* px-4 py-2 */
-      font-weight: 600; /* font-semibold */
+      padding: 0.5rem 1rem;
+      font-weight: 600;
       cursor: pointer;
-      color: #6b7280; /* text-gray-500 */
+      color: #6b7280;
     }
     .tab.active {
-      border-bottom: 2px solid #2563eb; /* border-b-2 border-blue-600 */
-      color: #2563eb; /* text-blue-600 */
+      border-bottom: 2px solid #2563eb;
+      color: #2563eb;
     }
     h1 {
-      margin-bottom: 1rem; /* mb-4 */
-      color: #2563eb; /* text-blue-600 primary */
-      font-size: 1.5rem; /* text-2xl */
+      margin-bottom: 1rem;
+      color: #2563eb;
+      font-size: 1.5rem;
       font-weight: 600;
     }
     input, select {
       width: 90%;
-      padding: 0.5rem; /* p-2 */
-      margin: 0.5rem 0; /* my-2 */
-      border-radius: 0.375rem; /* rounded-md */
-      border: 1px solid #d1d5db; /* border-gray-300 */
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border-radius: 0.375rem;
+      border: 1px solid #d1d5db;
       background-color: white;
     }
     button, input[type=submit] {
-      padding: 0.5rem 1rem; /* px-4 py-2 */
-      margin: 0.25rem; /* m-1 */
+      padding: 0.5rem 1rem;
+      margin: 0.25rem;
       border: none;
-      border-radius: 0.375rem; /* rounded-md */
+      border-radius: 0.375rem;
       font-weight: 600;
       cursor: pointer;
-      background-color: #2563eb; /* bg-blue-600 */
-      color: white; /* text-white */
+      background-color: #2563eb;
+      color: white;
     }
     button:hover, input[type=submit]:hover {
-      background-color: #1d4ed8; /* hover:bg-blue-700 */
+      background-color: #1d4ed8;
     }
     video, canvas, img {
       max-width: 100%;
       max-height: 400px;
-      border: 1px solid #e5e7eb; /* border gray-200 */
-      border-radius: 0.5rem; /* rounded-lg */
-      margin: 0.5rem 0; /* my-2 */
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      margin: 0.5rem 0;
     }
     .hidden { display: none; }
-    .error { color: #ef4444; /* red-500 */ margin: 0.5rem 0; /* my-2 */ }
-    .success { color: #10b981; /* green-500 */ margin: 0.5rem 0; }
+    .error { color: #ef4444; margin: 0.5rem 0; }
+    .success { color: #10b981; margin: 0.5rem 0; }
     .spinner {
-      border: 4px solid rgba(0,0,0,0.1); /* Adjusted for light theme */
-      border-top: 4px solid #2563eb; /* blue-600 */
+      border: 4px solid rgba(0,0,0,0.1);
+      border-top: 4px solid #2563eb;
       border-radius: 50%;
       width: 50px;
       height: 50px;
@@ -90,7 +91,7 @@
     #loadingOverlay {
       position: fixed;
       inset: 0;
-      background: rgba(255,255,255,0.7); /* Light overlay */
+      background: rgba(255,255,255,0.7);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -281,6 +282,11 @@
     }
 
     window.onbeforeunload = () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
+
+    // Hide overlay when page reloads
+    window.onload = () => {
+      overlay.classList.add("hidden");
+    };
   </script>
 </body>
 </html>
