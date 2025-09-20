@@ -10,88 +10,88 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f9fafb; /* Light gray bg like Tailwind gray-50 */
-      color: #111827; /* Dark text gray-900 */
+      background: #f9fafb;
+      color: #111827;
       font-family: Arial, sans-serif;
       margin: 0;
     }
     .container {
-      background: white; /* bg-white */
-      border: 1px solid #e5e7eb; /* border gray-200 */
-      border-radius: 0.5rem; /* rounded-lg */
-      padding: 1.25rem; /* p-5 */
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      padding: 1.25rem;
       max-width: 500px;
       width: 100%;
       text-align: center;
-      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow */
+      box-shadow: 0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px 0 rgba(0,0,0,.06);
     }
     .tabs {
       display: flex;
       justify-content: center;
-      margin-bottom: 1rem; /* mb-4 */
-      border-bottom: 1px solid #e5e7eb; /* divide-y gray-200 */
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #e5e7eb;
     }
     .tab {
-      padding: 0.5rem 1rem; /* px-4 py-2 */
-      font-weight: 600; /* font-semibold */
+      padding: 0.5rem 1rem;
+      font-weight: 600;
       cursor: pointer;
-      color: #6b7280; /* text-gray-500 */
+      color: #6b7280;
     }
     .tab.active {
-      border-bottom: 2px solid #2563eb; /* border-b-2 border-blue-600 */
-      color: #2563eb; /* text-blue-600 */
+      border-bottom: 2px solid #2563eb;
+      color: #2563eb;
     }
     h1 {
-      margin-bottom: 1rem; /* mb-4 */
-      color: #2563eb; /* text-blue-600 primary */
-      font-size: 1.5rem; /* text-2xl */
+      margin-bottom: 1rem;
+      color: #2563eb;
+      font-size: 1.5rem;
       font-weight: 600;
     }
     input, select {
       width: 90%;
-      padding: 0.5rem; /* p-2 */
-      margin: 0.5rem 0; /* my-2 */
-      border-radius: 0.375rem; /* rounded-md */
-      border: 1px solid #d1d5db; /* border-gray-300 */
+      padding: 0.5rem;
+      margin: 0.5rem 0;
+      border-radius: 0.375rem;
+      border: 1px solid #d1d5db;
       background-color: white;
     }
     button, input[type=submit] {
-      padding: 0.5rem 1rem; /* px-4 py-2 */
-      margin: 0.25rem; /* m-1 */
+      padding: 0.5rem 1rem;
+      margin: 0.25rem;
       border: none;
-      border-radius: 0.375rem; /* rounded-md */
+      border-radius: 0.375rem;
       font-weight: 600;
       cursor: pointer;
-      background-color: #2563eb; /* bg-blue-600 */
-      color: white; /* text-white */
+      background-color: #2563eb;
+      color: white;
     }
     button:hover, input[type=submit]:hover {
-      background-color: #1d4ed8; /* hover:bg-blue-700 */
+      background-color: #1d4ed8;
     }
     video, canvas, img {
       max-width: 100%;
       max-height: 400px;
-      border: 1px solid #e5e7eb; /* border gray-200 */
-      border-radius: 0.5rem; /* rounded-lg */
-      margin: 0.5rem 0; /* my-2 */
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      margin: 0.5rem 0;
     }
     .hidden { display: none; }
-    .error { color: #ef4444; /* red-500 */ margin: 0.5rem 0; /* my-2 */ }
-    .success { color: #10b981; /* green-500 */ margin: 0.5rem 0; }
+    .error { color: #ef4444; margin: 0.5rem 0; }
+    .success { color: #10b981; margin: 0.5rem 0; }
     .status-message {
       padding: 0.75rem;
       border-radius: 0.375rem;
       margin-top: 1rem;
     }
     .status-message.error {
-      background-color: #fee2e2; /* red-100 */
-      color: #ef4444; /* red-500 */
-      border: 1px solid #fca5a5; /* red-300 */
+      background-color: #fee2e2;
+      color: #ef4444;
+      border: 1px solid #fca5a5;
     }
     .status-message.success {
-      background-color: #d1fae5; /* green-100 */
-      color: #10b981; /* green-500 */
-      border: 1px solid #6ee7b7; /* green-300 */
+      background-color: #d1fae5;
+      color: #10b981;
+      border: 1px solid #6ee7b7;
     }
   </style>
 </head>
@@ -101,13 +101,15 @@
       <div id="verify-tab" class="tab active">Verify Face</div>
       <div id="admin-tab" class="tab">Admin</div>
     </div>
-
     <div id="verify-content">
       <h1>Face Match Capture</h1>
-      <form id="verify-form" action="/verify" method="post" enctype="multipart/form-data">
+      <form id="verify-form" action="/verify" method="post" enctype="multipart/form-data" onsubmit="return validateVerifyForm()">
         <label for="reference_name">Reference (optional):</label>
         <select name="reference_name" id="reference_name">
           <option value="">Check all images</option>
+          {% for name in reference_names %}
+            <option value="{{ name }}">{{ name }}</option>
+          {% endfor %}
         </select>
         <video id="webcam" autoplay></video>
         <canvas id="canvas" class="hidden"></canvas>
@@ -117,6 +119,11 @@
         </div>
         <input type="file" name="file" id="image-data" accept="image/jpeg" class="hidden">
         <div id="verify-status" class="status-message hidden"></div>
+        {% if message %}
+          <div class="status-message {% if 'No match' in message or 'No face' in message or 'No file' in message or 'Error' in message or 'Multiple' in message %}error{% else %}success{% endif %}">
+            {{ message }}
+          </div>
+        {% endif %}
         <div>
           <button type="button" id="start-webcam">Start Webcam</button>
           <button type="button" id="capture" class="hidden">Capture Photo</button>
@@ -125,7 +132,6 @@
         <input type="submit" id="verify-submit" value="Upload & Match" disabled>
       </form>
     </div>
-
     <div id="admin-content" class="hidden">
       <h1>Admin Panel</h1>
       <div id="admin-login">
@@ -134,7 +140,7 @@
         <button type="button" id="admin-login-btn">Login</button>
         <div id="admin-status" class="status-message hidden"></div>
       </div>
-      <form id="admin-form" action="/add_user" method="post" enctype="multipart/form-data" class="hidden">
+      <form id="admin-form" action="/add_user" method="post" enctype="multipart/form-data" class="hidden" onsubmit="return validateAdminForm()">
         <input type="text" name="name" id="new-name" placeholder="Enter name" required>
         <input type="text" name="uid" id="new-uid" placeholder="Enter UID (optional)">
         <input type="file" name="file" id="new-image" accept="image/jpeg,image/png" required>
@@ -143,7 +149,6 @@
       </form>
     </div>
   </div>
-
   <script>
     const webcam = document.getElementById('webcam');
     const canvas = document.getElementById('canvas');
@@ -151,7 +156,6 @@
     const startWebcamButton = document.getElementById('start-webcam');
     const retakeButton = document.getElementById('retake');
     const imageDataInput = document.getElementById('image-data');
-    const verifyStatus = document.getElementById('verify-status');
     const preview = document.getElementById('preview');
     const verifyTab = document.getElementById('verify-tab');
     const adminTab = document.getElementById('admin-tab');
@@ -163,39 +167,16 @@
     const adminLoginBtn = document.getElementById('admin-login-btn');
     const adminStatus = document.getElementById('admin-status');
     const adminUploadStatus = document.getElementById('admin-upload-status');
-    const verifyForm = document.getElementById('verify-form');
     const verifySubmitButton = document.getElementById('verify-submit');
-    const referenceNameSelect = document.getElementById('reference_name');
     let stream = null;
 
-    // Helper function to display messages
     function showMessage(element, message, type) {
       element.textContent = message;
       element.classList.remove("hidden", "error", "success");
       element.classList.add(type);
     }
 
-    // Populate the reference names dropdown
-    async function populateUserDropdown() {
-      try {
-        const response = await fetch('/get_users');
-        if (!response.ok) throw new Error("Failed to fetch user list.");
-        const users = await response.json();
-        users.forEach(user => {
-          const option = document.createElement('option');
-          option.value = user.name;
-          option.textContent = user.name;
-          referenceNameSelect.appendChild(option);
-        });
-      } catch (err) {
-        console.error("Error populating user list:", err);
-      }
-    }
-    
-    // Initial call to populate the dropdown
-    populateUserDropdown();
-
-    // Tabs
+    // Tab switching
     verifyTab.onclick = () => {
       verifyTab.classList.add("active");
       adminTab.classList.remove("active");
@@ -209,7 +190,7 @@
       verifyContent.classList.add("hidden");
     };
 
-    // Admin login
+    // Admin login (unchanged, still AJAX; backend must return JSON for admin login and you can keep this part as is)
     adminLoginBtn.onclick = async () => {
       showMessage(adminStatus, "", "hidden");
       if (!adminPassword.value) {
@@ -237,7 +218,6 @@
 
     // Webcam start
     startWebcamButton.onclick = async () => {
-      showMessage(verifyStatus, "", "hidden");
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
         webcam.srcObject = stream;
@@ -251,7 +231,7 @@
         preview.classList.add("hidden");
         verifySubmitButton.disabled = true;
       } catch (err) {
-        showMessage(verifyStatus, "Error accessing webcam: " + err.message, "error");
+        alert("Error accessing webcam: " + err.message);
       }
     };
 
@@ -261,22 +241,19 @@
       context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => {
         if (!blob) {
-          showMessage(verifyStatus, "Failed to capture image.", "error");
+          alert("Failed to capture image.");
           return;
         }
         const file = new File([blob], "webcam_capture.jpg", { type: "image/jpeg" });
         const dt = new DataTransfer();
         dt.items.add(file);
         imageDataInput.files = dt.files;
-        
-        // Display the captured image and hide the webcam
         webcam.classList.add("hidden");
         preview.src = URL.createObjectURL(file);
         preview.classList.remove("hidden");
         captureButton.classList.add("hidden");
         retakeButton.classList.remove("hidden");
         verifySubmitButton.disabled = false;
-        showMessage(verifyStatus, "Photo captured. Click 'Upload & Match' to verify or 'Retake' to try again.", "success");
       }, "image/jpeg", 0.9);
     };
 
@@ -287,82 +264,37 @@
       retakeButton.classList.add("hidden");
       captureButton.classList.remove("hidden");
       verifySubmitButton.disabled = true;
-      imageDataInput.files = null; // Clear the file input
-      showMessage(verifyStatus, "Webcam is ready. Please capture a new photo.", "success");
+      imageDataInput.files = null;
     };
 
-    // Form submission
-    verifyForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      showMessage(verifyStatus, "", "hidden");
-
+    // Form validation for verify
+    function validateVerifyForm() {
       if (!imageDataInput.files || imageDataInput.files.length === 0) {
-        showMessage(verifyStatus, "Please capture a photo before submitting.", "error");
-        return;
+        alert("Please capture or upload a photo.");
+        return false;
       }
-
-      const formData = new FormData(verifyForm);
-      verifySubmitButton.disabled = true;
-      showMessage(verifyStatus, "Processing, please wait...", "success");
-
-      try {
-        const response = await fetch('/verify', {
-          method: 'POST',
-          body: formData,
-        });
-
-        const result = await response.json();
-        if (response.ok) {
-          showMessage(verifyStatus, result.message, "success");
-        } else {
-          showMessage(verifyStatus, result.message || "An error occurred.", "error");
-        }
-      } catch (err) {
-        showMessage(verifyStatus, "Error during verification. Check your network or server connection.", "error");
-      } finally {
-        verifySubmitButton.disabled = false;
+      const file = imageDataInput.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image too large. Max size is 5MB.");
+        return false;
       }
-    });
-    
-    adminForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      showMessage(adminUploadStatus, "", "hidden");
+      return true;
+    }
 
-      if (!document.getElementById("new-image").files.length) {
+    // Form validation for admin
+    function validateAdminForm() {
+      const fileInput = document.getElementById("new-image");
+      const nameInput = document.getElementById("new-name");
+      if (!fileInput.files || fileInput.files.length === 0) {
         showMessage(adminUploadStatus, "Please select an image.", "error");
-        return;
+        return false;
       }
-      if (!document.getElementById("new-name").value.trim()) {
+      if (!nameInput.value.trim()) {
         showMessage(adminUploadStatus, "Name is required.", "error");
-        return;
+        return false;
       }
-
-      const formData = new FormData(adminForm);
-      const submitButton = e.target.querySelector('input[type="submit"]');
-      submitButton.disabled = true;
-      showMessage(adminUploadStatus, "Adding user...", "success");
-
-      try {
-        const response = await fetch('/add_user', {
-          method: 'POST',
-          body: formData,
-        });
-        const result = await response.json();
-        if (response.ok) {
-          showMessage(adminUploadStatus, result.message || 'User added successfully!', "success");
-          // Clear form fields
-          adminForm.reset(); 
-          // Re-populate the dropdown
-          populateUserDropdown();
-        } else {
-          showMessage(adminUploadStatus, result.message || "An error occurred.", "error");
-        }
-      } catch (err) {
-        showMessage(adminUploadStatus, "Error adding user. Check your network or server connection.", "error");
-      } finally {
-        submitButton.disabled = false;
-      }
-    });
+      return true;
+    }
 
     window.onbeforeunload = () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   </script>
