@@ -78,51 +78,67 @@
     .hidden { display: none; }
     .error { color: #ef4444; /* red-500 */ margin: 0.5rem 0; /* my-2 */ }
     .success { color: #10b981; /* green-500 */ margin: 0.5rem 0; }
+    .status-message {
+      padding: 0.75rem;
+      border-radius: 0.375rem;
+      margin-top: 1rem;
+    }
+    .status-message.error {
+      background-color: #fee2e2; /* red-100 */
+      color: #ef4444; /* red-500 */
+      border: 1px solid #fca5a5; /* red-300 */
+    }
+    .status-message.success {
+      background-color: #d1fae5; /* green-100 */
+      color: #10b981; /* green-500 */
+      border: 1px solid #6ee7b7; /* green-300 */
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- Tabs -->
     <div class="tabs">
       <div id="verify-tab" class="tab active">Verify Face</div>
       <div id="admin-tab" class="tab">Admin</div>
     </div>
 
-    <!-- Verify Face -->
     <div id="verify-content">
       <h1>Face Match Capture</h1>
       <form id="verify-form" action="/verify" method="post" enctype="multipart/form-data">
-        <label>Reference (optional):</label>
+        <label for="reference_name">Reference (optional):</label>
         <select name="reference_name" id="reference_name">
           <option value="">Check all images</option>
         </select>
         <video id="webcam" autoplay></video>
         <canvas id="canvas" class="hidden"></canvas>
-        <img id="preview" class="hidden" alt="Captured Preview">
+        <div id="video-container" class="relative">
+          <video id="webcam" autoplay class="w-full h-auto"></video>
+          <img id="preview" class="hidden w-full h-auto" alt="Captured Preview">
+        </div>
         <input type="file" name="file" id="image-data" accept="image/jpeg" class="hidden">
-        <div id="verify-error" class="error hidden"></div>
+        <div id="verify-status" class="status-message hidden"></div>
         <div>
           <button type="button" id="start-webcam">Start Webcam</button>
           <button type="button" id="capture" class="hidden">Capture Photo</button>
+          <button type="button" id="retake" class="hidden">Retake</button>
         </div>
-        <input type="submit" id="verify-submit" value="Upload & Match">
+        <input type="submit" id="verify-submit" value="Upload & Match" disabled>
       </form>
     </div>
 
-    <!-- Admin -->
     <div id="admin-content" class="hidden">
       <h1>Admin Panel</h1>
       <div id="admin-login">
-        <label>Enter Admin Password:</label>
+        <label for="admin-password">Enter Admin Password:</label>
         <input type="password" id="admin-password" placeholder="Password">
         <button type="button" id="admin-login-btn">Login</button>
-        <div id="admin-error" class="error hidden"></div>
+        <div id="admin-status" class="status-message hidden"></div>
       </div>
       <form id="admin-form" action="/add_user" method="post" enctype="multipart/form-data" class="hidden">
         <input type="text" name="name" id="new-name" placeholder="Enter name" required>
         <input type="text" name="uid" id="new-uid" placeholder="Enter UID (optional)">
-        <input type="file" name="file" id="new-image" accept="image/jpeg,image/png">
-        <div id="admin-upload-error" class="error hidden"></div>
+        <input type="file" name="file" id="new-image" accept="image/jpeg,image/png" required>
+        <div id="admin-upload-status" class="status-message hidden"></div>
         <input type="submit" value="Add User">
       </form>
     </div>
@@ -133,8 +149,9 @@
     const canvas = document.getElementById('canvas');
     const captureButton = document.getElementById('capture');
     const startWebcamButton = document.getElementById('start-webcam');
+    const retakeButton = document.getElementById('retake');
     const imageDataInput = document.getElementById('image-data');
-    const verifyError = document.getElementById('verify-error');
+    const verifyStatus = document.getElementById('verify-status');
     const preview = document.getElementById('preview');
     const verifyTab = document.getElementById('verify-tab');
     const adminTab = document.getElementById('admin-tab');
@@ -144,10 +161,39 @@
     const adminForm = document.getElementById('admin-form');
     const adminPassword = document.getElementById('admin-password');
     const adminLoginBtn = document.getElementById('admin-login-btn');
-    const adminError = document.getElementById('admin-error');
-    const adminUploadError = document.getElementById('admin-upload-error');
+    const adminStatus = document.getElementById('admin-status');
+    const adminUploadStatus = document.getElementById('admin-upload-status');
     const verifyForm = document.getElementById('verify-form');
+    const verifySubmitButton = document.getElementById('verify-submit');
+    const referenceNameSelect = document.getElementById('reference_name');
     let stream = null;
+
+    // Helper function to display messages
+    function showMessage(element, message, type) {
+      element.textContent = message;
+      element.classList.remove("hidden", "error", "success");
+      element.classList.add(type);
+    }
+
+    // Populate the reference names dropdown
+    async function populateUserDropdown() {
+      try {
+        const response = await fetch('/get_users');
+        if (!response.ok) throw new Error("Failed to fetch user list.");
+        const users = await response.json();
+        users.forEach(user => {
+          const option = document.createElement('option');
+          option.value = user.name;
+          option.textContent = user.name;
+          referenceNameSelect.appendChild(option);
+        });
+      } catch (err) {
+        console.error("Error populating user list:", err);
+      }
+    }
+    
+    // Initial call to populate the dropdown
+    populateUserDropdown();
 
     // Tabs
     verifyTab.onclick = () => {
@@ -165,10 +211,9 @@
 
     // Admin login
     adminLoginBtn.onclick = async () => {
-      adminError.classList.add("hidden");
+      showMessage(adminStatus, "", "hidden");
       if (!adminPassword.value) {
-        adminError.textContent = "Please enter a password.";
-        adminError.classList.remove("hidden");
+        showMessage(adminStatus, "Please enter a password.", "error");
         return;
       }
       try {
@@ -181,18 +226,18 @@
         if (result.success) {
           adminLogin.classList.add("hidden");
           adminForm.classList.remove("hidden");
+          showMessage(adminStatus, "Login successful!", "success");
         } else {
-          adminError.textContent = result.message || "Invalid password.";
-          adminError.classList.remove("hidden");
+          showMessage(adminStatus, result.message || "Invalid password.", "error");
         }
       } catch {
-        adminError.textContent = "Error verifying password.";
-        adminError.classList.remove("hidden");
+        showMessage(adminStatus, "Error verifying password.", "error");
       }
     };
 
     // Webcam start
     startWebcamButton.onclick = async () => {
+      showMessage(verifyStatus, "", "hidden");
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
         webcam.srcObject = stream;
@@ -200,11 +245,13 @@
           canvas.width = webcam.videoWidth;
           canvas.height = webcam.videoHeight;
         };
-        captureButton.classList.remove("hidden");
         startWebcamButton.classList.add("hidden");
+        captureButton.classList.remove("hidden");
+        webcam.classList.remove("hidden");
+        preview.classList.add("hidden");
+        verifySubmitButton.disabled = true;
       } catch (err) {
-        verifyError.textContent = "Error accessing webcam: " + err.message;
-        verifyError.classList.remove("hidden");
+        showMessage(verifyStatus, "Error accessing webcam: " + err.message, "error");
       }
     };
 
@@ -213,89 +260,107 @@
       const context = canvas.getContext("2d");
       context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(blob => {
-        if (!blob) return;
+        if (!blob) {
+          showMessage(verifyStatus, "Failed to capture image.", "error");
+          return;
+        }
         const file = new File([blob], "webcam_capture.jpg", { type: "image/jpeg" });
         const dt = new DataTransfer();
         dt.items.add(file);
         imageDataInput.files = dt.files;
+        
+        // Display the captured image and hide the webcam
+        webcam.classList.add("hidden");
         preview.src = URL.createObjectURL(file);
         preview.classList.remove("hidden");
-        alert("Photo captured! Click 'Upload & Match' to proceed.");
+        captureButton.classList.add("hidden");
+        retakeButton.classList.remove("hidden");
+        verifySubmitButton.disabled = false;
+        showMessage(verifyStatus, "Photo captured. Click 'Upload & Match' to verify or 'Retake' to try again.", "success");
       }, "image/jpeg", 0.9);
     };
 
-    // Verify form submission (async with timeout)
+    // Retake photo
+    retakeButton.onclick = () => {
+      webcam.classList.remove("hidden");
+      preview.classList.add("hidden");
+      retakeButton.classList.add("hidden");
+      captureButton.classList.remove("hidden");
+      verifySubmitButton.disabled = true;
+      imageDataInput.files = null; // Clear the file input
+      showMessage(verifyStatus, "Webcam is ready. Please capture a new photo.", "success");
+    };
+
+    // Form submission
     verifyForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      verifyError.classList.add('hidden');
-      if (!imageDataInput.files.length) {
-        verifyError.textContent = "Please capture or upload a photo.";
-        verifyError.classList.remove("hidden");
+      showMessage(verifyStatus, "", "hidden");
+
+      if (!imageDataInput.files || imageDataInput.files.length === 0) {
+        showMessage(verifyStatus, "Please capture a photo before submitting.", "error");
         return;
       }
-      const file = imageDataInput.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        verifyError.textContent = "Image too large. Max size 5MB.";
-        verifyError.classList.remove("hidden");
-        return;
-      }
+
       const formData = new FormData(verifyForm);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      verifySubmitButton.disabled = true;
+      showMessage(verifyStatus, "Processing, please wait...", "success");
+
       try {
         const response = await fetch('/verify', {
           method: 'POST',
           body: formData,
-          signal: controller.signal
         });
-        clearTimeout(timeoutId);
-        const result = await response.json(); // Assuming server returns JSON
-        alert(result.message || 'Verification complete!'); // Handle response
-      } catch (err) {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') {
-          verifyError.textContent = "Request timed out. Check server connection.";
+
+        const result = await response.json();
+        if (response.ok) {
+          showMessage(verifyStatus, result.message, "success");
         } else {
-          verifyError.textContent = "Error during verification: " + err.message;
+          showMessage(verifyStatus, result.message || "An error occurred.", "error");
         }
-        verifyError.classList.remove("hidden");
+      } catch (err) {
+        showMessage(verifyStatus, "Error during verification. Check your network or server connection.", "error");
+      } finally {
+        verifySubmitButton.disabled = false;
       }
     });
-
-    // Admin form submission (async with timeout)
+    
     adminForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      adminUploadError.classList.add('hidden');
+      showMessage(adminUploadStatus, "", "hidden");
+
       if (!document.getElementById("new-image").files.length) {
-        adminUploadError.textContent = "Please select an image.";
-        adminUploadError.classList.remove("hidden");
+        showMessage(adminUploadStatus, "Please select an image.", "error");
         return;
       }
       if (!document.getElementById("new-name").value.trim()) {
-        adminUploadError.textContent = "Name is required.";
-        adminUploadError.classList.remove("hidden");
+        showMessage(adminUploadStatus, "Name is required.", "error");
         return;
       }
+
       const formData = new FormData(adminForm);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const submitButton = e.target.querySelector('input[type="submit"]');
+      submitButton.disabled = true;
+      showMessage(adminUploadStatus, "Adding user...", "success");
+
       try {
         const response = await fetch('/add_user', {
           method: 'POST',
           body: formData,
-          signal: controller.signal
         });
-        clearTimeout(timeoutId);
-        const result = await response.json(); // Assuming server returns JSON
-        alert(result.message || 'User added successfully!'); // Handle response
-      } catch (err) {
-        clearTimeout(timeoutId);
-        if (err.name === 'AbortError') {
-          adminUploadError.textContent = "Request timed out. Check server connection.";
+        const result = await response.json();
+        if (response.ok) {
+          showMessage(adminUploadStatus, result.message || 'User added successfully!', "success");
+          // Clear form fields
+          adminForm.reset(); 
+          // Re-populate the dropdown
+          populateUserDropdown();
         } else {
-          adminUploadError.textContent = "Error adding user: " + err.message;
+          showMessage(adminUploadStatus, result.message || "An error occurred.", "error");
         }
-        adminUploadError.classList.remove("hidden");
+      } catch (err) {
+        showMessage(adminUploadStatus, "Error adding user. Check your network or server connection.", "error");
+      } finally {
+        submitButton.disabled = false;
       }
     });
 
