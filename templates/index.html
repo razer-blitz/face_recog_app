@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Face Recognition</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       min-height: 100vh;
@@ -68,31 +68,15 @@
     button:hover, input[type=submit]:hover {
       background-color: #1d4ed8;
     }
-    #video-container {
-      position: relative;
+    video, img {
+      max-width: 100%;
+      max-height: 400px;
       border: 1px solid #e5e7eb;
       border-radius: 0.5rem;
       margin: 0.5rem 0;
-      max-height: 400px;
-      overflow: hidden;
-    }
-    #webcam, #preview {
-      max-width: 100%;
-      max-height: 400px;
-      border-radius: 0.5rem;
-      /* Flip horizontally for mirror effect */
       transform: scaleX(-1);
-      display: block;
-      margin: 0 auto;
     }
-    #preview.hidden, #webcam.hidden {
-      display: none;
-    }
-    .hidden {
-      display: none;
-    }
-    .error { color: #ef4444; margin: 0.5rem 0; }
-    .success { color: #10b981; margin: 0.5rem 0; }
+    .hidden { display: none; }
     .status-message {
       padding: 0.75rem;
       border-radius: 0.375rem;
@@ -108,6 +92,20 @@
       color: #10b981;
       border: 1px solid #6ee7b7;
     }
+    /* ✅ Spinner */
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #2563eb;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      margin: 1rem auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -116,113 +114,83 @@
       <div id="verify-tab" class="tab active">Verify Face</div>
       <div id="admin-tab" class="tab">Admin</div>
     </div>
+    <!-- Verify Section -->
     <div id="verify-content">
       <h1>Face Match Capture</h1>
-      <form
-        id="verify-form"
-        action="/verify"
-        method="post"
-        enctype="multipart/form-data"
-        onsubmit="return validateVerifyForm()"
-      >
+      <form id="verify-form" action="/verify" method="post" enctype="multipart/form-data" onsubmit="return handleVerifySubmit(event)">
         <label for="reference_name">Reference (optional):</label>
         <select name="reference_name" id="reference_name">
           <option value="">Check all images</option>
           {% for name in reference_names %}
-          <option value="{{ name }}">{{ name }}</option>
+            <option value="{{ name }}">{{ name }}</option>
           {% endfor %}
         </select>
-
         <div id="video-container">
           <video id="webcam" autoplay></video>
-          <img id="preview" class="hidden" alt="Captured Preview" />
+          <img id="preview" class="hidden" alt="Captured Preview">
         </div>
-
-        <input
-          type="file"
-          name="file"
-          id="image-data"
-          accept="image/jpeg"
-          class="hidden"
-        />
+        <input type="file" name="file" id="image-data" accept="image/jpeg" class="hidden">
         <div id="verify-status" class="status-message hidden"></div>
+        <div id="verify-spinner" class="spinner hidden"></div>
         {% if message %}
-        <div
-          class="status-message
-          {% if 'No match' in message or 'No face' in message or 'No file' in message or 'Error' in message or 'Multiple' in message %}
-            error
-          {% else %}
-            success
-          {% endif %}"
-        >
-          {{ message }}
-        </div>
+          <div class="status-message {% if 'No match' in message or 'No face' in message or 'No file' in message or 'Error' in message or 'Multiple' in message %}error{% else %}success{% endif %}">
+            {{ message }}
+          </div>
         {% endif %}
         <div>
           <button type="button" id="start-webcam">Start Webcam</button>
           <button type="button" id="capture" class="hidden">Capture Photo</button>
           <button type="button" id="retake" class="hidden">Retake</button>
         </div>
-        <input type="submit" id="verify-submit" value="Upload & Match" disabled />
+        <input type="submit" id="verify-submit" value="Upload & Match" disabled>
       </form>
     </div>
+    <!-- Admin Section -->
     <div id="admin-content" class="hidden">
       <h1>Admin Panel</h1>
       <div id="admin-login">
         <label for="admin-password">Enter Admin Password:</label>
-        <input type="password" id="admin-password" placeholder="Password" />
+        <input type="password" id="admin-password" placeholder="Password">
         <button type="button" id="admin-login-btn">Login</button>
         <div id="admin-status" class="status-message hidden"></div>
       </div>
-      <form
-        id="admin-form"
-        action="/add_user"
-        method="post"
-        enctype="multipart/form-data"
-        class="hidden"
-        onsubmit="return validateAdminForm()"
-      >
-        <input type="text" name="name" id="new-name" placeholder="Enter name" required />
-        <input type="text" name="uid" id="new-uid" placeholder="Enter UID (optional)" />
-        <input
-          type="file"
-          name="file"
-          id="new-image"
-          accept="image/jpeg,image/png"
-          required
-        />
+      <form id="admin-form" action="/add_user" method="post" enctype="multipart/form-data" class="hidden" onsubmit="return handleAdminSubmit(event)">
+        <input type="text" name="name" id="new-name" placeholder="Enter name" required>
+        <input type="text" name="uid" id="new-uid" placeholder="Enter UID (optional)">
+        <input type="file" name="file" id="new-image" accept="image/jpeg,image/png" required>
         <div id="admin-upload-status" class="status-message hidden"></div>
-        <input type="submit" value="Add User" />
+        <div id="admin-spinner" class="spinner hidden"></div>
+        <input type="submit" value="Add User">
       </form>
     </div>
   </div>
-
   <script>
-    const webcam = document.getElementById("webcam");
-    const canvas = document.createElement("canvas");
-    const captureButton = document.getElementById("capture");
-    const startWebcamButton = document.getElementById("start-webcam");
-    const retakeButton = document.getElementById("retake");
-    const imageDataInput = document.getElementById("image-data");
-    const preview = document.getElementById("preview");
-    const verifyTab = document.getElementById("verify-tab");
-    const adminTab = document.getElementById("admin-tab");
-    const verifyContent = document.getElementById("verify-content");
-    const adminContent = document.getElementById("admin-content");
-    const adminLogin = document.getElementById("admin-login");
-    const adminForm = document.getElementById("admin-form");
-    const adminPassword = document.getElementById("admin-password");
-    const adminLoginBtn = document.getElementById("admin-login-btn");
-    const adminStatus = document.getElementById("admin-status");
-    const adminUploadStatus = document.getElementById("admin-upload-status");
-    const verifySubmitButton = document.getElementById("verify-submit");
-
+    const webcam = document.getElementById('webcam');
+    const captureButton = document.getElementById('capture');
+    const startWebcamButton = document.getElementById('start-webcam');
+    const retakeButton = document.getElementById('retake');
+    const imageDataInput = document.getElementById('image-data');
+    const preview = document.getElementById('preview');
+    const verifyTab = document.getElementById('verify-tab');
+    const adminTab = document.getElementById('admin-tab');
+    const verifyContent = document.getElementById('verify-content');
+    const adminContent = document.getElementById('admin-content');
+    const adminLogin = document.getElementById('admin-login');
+    const adminForm = document.getElementById('admin-form');
+    const adminPassword = document.getElementById('admin-password');
+    const adminLoginBtn = document.getElementById('admin-login-btn');
+    const adminStatus = document.getElementById('admin-status');
+    const adminUploadStatus = document.getElementById('admin-upload-status');
+    const verifySubmitButton = document.getElementById('verify-submit');
+    const verifySpinner = document.getElementById('verify-spinner');
+    const adminSpinner = document.getElementById('admin-spinner');
     let stream = null;
+    const canvas = document.createElement("canvas");
 
     function showMessage(element, message, type) {
       element.textContent = message;
       element.classList.remove("hidden", "error", "success");
-      element.classList.add(type);
+      if (type) element.classList.add(type);
     }
 
     // Tab switching
@@ -247,10 +215,10 @@
         return;
       }
       try {
-        const response = await fetch("/admin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ password: adminPassword.value }),
+        const response = await fetch('/admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: adminPassword.value })
         });
         const result = await response.json();
         if (result.success) {
@@ -284,34 +252,29 @@
       }
     };
 
-    // Capture photo and stop webcam
+    // Capture photo
     captureButton.onclick = () => {
       const context = canvas.getContext("2d");
-      // Flip horizontally while drawing
-      context.save();
+      context.translate(canvas.width, 0);
       context.scale(-1, 1);
-      context.drawImage(webcam, 0, 0, -canvas.width, canvas.height);
-      context.restore();
+      context.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+      context.setTransform(1, 0, 0, 1, 0, 0);
 
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          alert("Failed to capture image.");
-          return;
-        }
+      canvas.toBlob(blob => {
+        if (!blob) return alert("Failed to capture image.");
         const file = new File([blob], "webcam_capture.jpg", { type: "image/jpeg" });
         const dt = new DataTransfer();
         dt.items.add(file);
         imageDataInput.files = dt.files;
 
-        // Stop webcam stream to free camera
-        if (stream) {
-          stream.getTracks().forEach((track) => track.stop());
-          stream = null;
-        }
-
-        webcam.classList.add("hidden");
         preview.src = URL.createObjectURL(file);
         preview.classList.remove("hidden");
+        webcam.classList.add("hidden");
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          stream = null;
+        }
 
         captureButton.classList.add("hidden");
         retakeButton.classList.remove("hidden");
@@ -319,27 +282,22 @@
       }, "image/jpeg", 0.9);
     };
 
-    // Retake photo: restart webcam and toggle views
-    retakeButton.onclick = async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        webcam.srcObject = stream;
-        webcam.onloadedmetadata = () => {
-          canvas.width = webcam.videoWidth;
-          canvas.height = webcam.videoHeight;
-        };
-        webcam.classList.remove("hidden");
-        preview.classList.add("hidden");
-        retakeButton.classList.add("hidden");
-        captureButton.classList.remove("hidden");
-        verifySubmitButton.disabled = true;
-        imageDataInput.files = null;
-      } catch (err) {
-        alert("Error accessing webcam: " + err.message);
-      }
+    // Retake photo
+    retakeButton.onclick = () => {
+      preview.classList.add("hidden");
+      retakeButton.classList.add("hidden");
+      startWebcamButton.classList.remove("hidden");
+      verifySubmitButton.disabled = true;
+      imageDataInput.files = null;
     };
 
-    // Form validation for verify
+    // Verify form with spinner
+    function handleVerifySubmit(event) {
+      if (!validateVerifyForm()) return false;
+      verifySpinner.classList.remove("hidden");
+      return true;
+    }
+
     function validateVerifyForm() {
       if (!imageDataInput.files || imageDataInput.files.length === 0) {
         alert("Please capture or upload a photo.");
@@ -353,7 +311,13 @@
       return true;
     }
 
-    // Form validation for admin
+    // Admin form with spinner
+    function handleAdminSubmit(event) {
+      if (!validateAdminForm()) return false;
+      adminSpinner.classList.remove("hidden");
+      return true;
+    }
+
     function validateAdminForm() {
       const fileInput = document.getElementById("new-image");
       const nameInput = document.getElementById("new-name");
@@ -368,10 +332,7 @@
       return true;
     }
 
-    // Stop webcam when user closes or reloads page
-    window.onbeforeunload = () => {
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-    };
+    window.onbeforeunload = () => { if (stream) stream.getTracks().forEach(t => t.stop()); };
   </script>
 </body>
 </html>
